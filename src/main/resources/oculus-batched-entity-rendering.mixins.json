@@ -1,0 +1,17 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "net.coderbot.batchedentityrendering.mixin",
+  "compatibilityLevel": "JAVA_8",
+  "refmap": "mixins.oculus.refmap.json",
+  "client": [
+    "MixinBufferBuilder",
+    "MixinBufferBuilder_SegmentRendering",
+    "MixinDebugScreenOverlay",
+    "MixinRenderGlobal",
+    "MixinRenderGlobal_EntityListSorting"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

@@ -1,0 +1,133 @@
+plugins {
+	id "java-library"
+	id "com.gtnewhorizons.retrofuturagradle" version "1.3.26"
+	id 'com.github.johnrengelman.shadow' version '7.1.2'
+}
+
+archivesBaseName = "${project.mod_id}-mc${project.minecraft_version}-${project.mod_version}"
+
+// Set the toolchain version to decouple the Java we run Gradle with from the Java used to compile and run the mod
+java {
+    toolchain {
+        languageVersion.set(JavaLanguageVersion.of(8))
+        // Azul covers the most platforms for Java 8 toolchains, crucially including MacOS arm64
+        vendor.set(JvmVendorSpec.AZUL)
+    }
+}
+
+minecraft {
+	mcVersion.set(minecraft_version)
+	username.set("Developer")
+
+	injectedTags.put("MOD_VERSION", mod_version)
+	injectedTags.put("MOD_NAME", "Oculus")
+}
+
+tasks.injectTags.outputClassName.set("${mod_base_package}.Tags")
+
+tasks.deobfuscateMergedJarToSrg.configure {accessTransformerFiles.from("src/main/resources/META-INF/oculus_at.cfg")}
+
+repositories {
+	mavenLocal()
+	maven {	url "https://maven.cleanroommc.com" }
+	maven {
+        name 'SpongePowered Maven'
+        url 'https://repo.spongepowered.org/maven'
+    }
+	maven {
+		name = "CurseForge"
+		url = "https://cursemaven.com"
+		content {
+			includeGroup "curse.maven"
+		}
+	}
+	maven {
+		name = "Modrinth"
+		url = "https://api.modrinth.com/maven"
+		content {
+			includeGroup "maven.modrinth"
+		}
+	}
+}
+
+dependencies {
+	def mixinBooter = modUtils.enableMixins("zone.rong:mixinbooter:8.9", "mixins.oculus.refmap.json")
+    api (mixinBooter) {
+        transitive = false
+    }
+	annotationProcessor "org.ow2.asm:asm-debug-all:5.2"
+    annotationProcessor "com.google.guava:guava:32.1.2-jre"
+    annotationProcessor "com.google.code.gson:gson:2.8.9"
+    annotationProcessor (mixinBooter) {
+        transitive = false
+    }
+
+	//modCompileOnly "maven.modrinth:rubidium:0.2.13"
+
+	implementation(shadow(project(path: ":glsl-relocated", configuration: "bundledJar"))) {
+		transitive = false
+	}
+	implementation(shadow("org.anarres:jcpp:1.4.14")) {
+		transitive = false
+	}
+	implementation(shadow("org.slf4j:slf4j-api:1.7.12")) /* for jcpp */ {
+		transitive = false;
+	}
+
+	implementation fileTree(dir: 'libs', include: ['*.jar'])
+
+	compileOnly 'org.projectlombok:lombok:1.18.32'
+	annotationProcessor 'org.projectlombok:lombok:1.18.32'
+	testCompileOnly 'org.projectlombok:lombok:1.18.32'
+	testAnnotationProcessor 'org.projectlombok:lombok:1.18.32'
+}
+
+jar {
+	manifest {
+		attributes (
+				"FMLCorePlugin": "net.coderbot.iris.IrisMixinTweaker",
+				"FMLCorePluginContainsFMLMod": true,
+				"ForceLoadAsMod": true,
+				"FMLAT": "oculus_at.cfg"
+		)
+	}
+}
+
+processResources {
+	filesMatching("mcmod.info") { fcd ->
+		fcd.expand(
+				'mod_id': project.mod_id,
+				'mod_name': project.mod_name,
+				'mod_version': project.mod_version,
+				'mod_description': project.mod_description,
+				'minecraft_version': project.minecraft_version
+		)
+	}
+}
+
+tasks.withType(JavaCompile).configureEach {
+	it.options.encoding = "UTF-8"
+}
+
+tasks.register("obfShadowJar", com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar) {
+	configurations = [project.configurations.shadow]
+
+	from project.tasks.named("reobfJar").get().archiveFile.get().asFile
+
+	relocate 'org.apache.commons.collections4', 'oculus.org.apache.commons.collections4'
+	relocate 'org.anarres.cpp', 'oculus.org.anarres.cpp'
+	relocate 'org.slf4j', 'oculus.org.slf4j'
+	relocate 'org.antlr.v4.runtime', 'oculus.org.antlr.v4.runtime'
+
+	archiveClassifier.set "obf-shadow"
+
+	manifest {
+		attributes (
+				"Main-Class": "net.coderbot.iris.LaunchWarn",
+				"FMLCorePlugin": "net.coderbot.iris.IrisMixinTweaker",
+				"FMLCorePluginContainsFMLMod": true,
+				"ForceLoadAsMod": true,
+				"FMLAT": "oculus_at.cfg"
+		)
+	}
+}
